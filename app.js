@@ -184,21 +184,38 @@ function loadBlogPosts() {
     const blogGrid = document.getElementById('blogGrid');
     if (!blogGrid) return;
 
-    // Try to fetch blog posts from API, fallback to local data
-    fetch('/api/blog')
+    // Try to load from JSON file, fallback to local data
+    fetch('./blog_posts.json')
         .then(response => {
             if (response.ok) {
                 return response.json();
             }
-            throw new Error('API not available');
+            throw new Error('JSON file not found');
         })
         .then(posts => {
-            renderBlogPosts(posts);
+            // Format dates for display
+            const formattedPosts = posts.map(post => ({
+                ...post,
+                date: formatDate(post.date),
+                link: post.link || '#'
+            }));
+            renderBlogPosts(formattedPosts);
         })
         .catch(error => {
             console.log('Using local blog data:', error);
             renderBlogPosts(blogPosts);
         });
+}
+
+// Format date from YYYY-MM-DD to readable format
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    } catch (e) {
+        return dateStr;
+    }
 }
 
 // Render blog posts
@@ -226,39 +243,43 @@ function initializeContactForm() {
     const contactForm = document.getElementById('contactForm');
     if (!contactForm) return;
 
-    contactForm.addEventListener('submit', function(e) {
-        e.preventDefault();
+    // Check if form uses Formspree (has action attribute with formspree.io)
+    const formAction = contactForm.getAttribute('action');
+    const usesFormspree = formAction && formAction.includes('formspree.io');
 
-        const formData = {
-            name: document.getElementById('name').value,
-            email: document.getElementById('email').value,
-            message: document.getElementById('message').value
-        };
+    if (!usesFormspree) {
+        // If not using Formspree, use mailto fallback
+        contactForm.addEventListener('submit', function(e) {
+            e.preventDefault();
 
-        // Try to send to backend, otherwise show alert
-        fetch('/api/contact', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(formData)
-        })
-        .then(response => {
-            if (response.ok) {
-                return response.json();
-            }
-            throw new Error('Failed to send message');
-        })
-        .then(data => {
-            alert('Thank you for your message! I\'ll get back to you soon.');
-            contactForm.reset();
-        })
-        .catch(error => {
-            console.log('Form submission error:', error);
-            alert('Thank you for your message! I\'ll get back to you soon.');
-            contactForm.reset();
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const message = document.getElementById('message').value;
+
+            // Create mailto link
+            const subject = encodeURIComponent(`Contact from ${name}`);
+            const body = encodeURIComponent(`From: ${name} (${email})\n\nMessage:\n${message}`);
+            const mailtoLink = `mailto:ashmita@example.com?subject=${subject}&body=${body}`;
+
+            // Open email client
+            window.location.href = mailtoLink;
+            
+            // Show success message
+            setTimeout(() => {
+                alert('Thank you for your message! Your email client should open shortly.');
+                contactForm.reset();
+            }, 100);
         });
-    });
+    } else {
+        // Formspree will handle submission, just show success message
+        contactForm.addEventListener('submit', function(e) {
+            // Let Formspree handle the submission
+            setTimeout(() => {
+                alert('Thank you for your message! I\'ll get back to you soon.');
+                contactForm.reset();
+            }, 500);
+        });
+    }
 }
 
 // Smooth scrolling for navigation links
